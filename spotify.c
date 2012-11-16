@@ -1,8 +1,10 @@
-#include <libspotify/api.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+
+#include <libspotify/api.h>
+#include <event2/event.h>
 
 #include "spotify.h"
 
@@ -10,55 +12,15 @@
 #define VERSION "0.1"
 
 struct spotify_s {
+	struct event_base *event_base;
+
+	struct event *stop_event;
+
 	sp_session *session;
-	int running;
 };
 
-static void logged_in(sp_session *session, sp_error error);
-static void logged_out(sp_session *session);
-static void metadata_updated(sp_session *session);
-static void connection_error(sp_session *session, sp_error error);
-static void message_to_user(sp_session *session, const char *message);
-static void notify_main_thread(sp_session *session);
-static int music_delivery(sp_session *session, const sp_audioformat *format, const void *frames, int num_frames);
-static void play_token_lost(sp_session *session);
-static void log_message(sp_session *session, const char *data);
-static void end_of_track(sp_session *session);
-static void streaming_error(sp_session *session, sp_error error);
-static void userinfo_updated(sp_session *session);
-static void start_playback(sp_session *session);
-static void stop_playback(sp_session *session);
-static void get_audio_buffer_stats(sp_session *session, sp_audio_buffer_stats *stats);
-static void offline_status_updated(sp_session *session);
-static void offline_error(sp_session *session, sp_error error);
-static void credentials_blob_updated(sp_session *session, const char *blob);
-static void connectionstate_updated(sp_session *session);
-static void scrobble_error(sp_session *session, sp_error error);
-static void private_session_mode_changed(sp_session *session, bool is_private);
-
-static sp_session_callbacks callbacks = {
-	&logged_in,
-	&logged_out,
-	&metadata_updated,
-	&connection_error,
-	&message_to_user,
-	&notify_main_thread,
-	&music_delivery,
-	&play_token_lost,
-	&log_message,
-	&end_of_track,
-	&streaming_error,
-	&userinfo_updated,
-	&start_playback,
-	&stop_playback,
-	&get_audio_buffer_stats,
-	&offline_status_updated,
-	&offline_error,
-	&credentials_blob_updated,
-	&connectionstate_updated,
-	&scrobble_error,
-	&private_session_mode_changed
-};
+#include "spotify_api_callbacks.c"
+#include "spotify_event_callbacks.c"
 
 spotify_t *
 spotify_init(const char *username, const char *password, int *error)
@@ -66,11 +28,11 @@ spotify_init(const char *username, const char *password, int *error)
 	spotify_t *spotify;
 	sp_session_config config;
 	sp_error sp_error;
-	sp_session *session;
+	sp_session *sp_session;
 
 	memset(&config, 0, sizeof(sp_session_config));
 	memset(&sp_error, 0, sizeof(sp_error));
-	session = NULL;
+	sp_session = NULL;
 
 	if (error) *error = 0;
 	spotify = calloc(1, sizeof(spotify_t));
@@ -78,7 +40,14 @@ spotify_init(const char *username, const char *password, int *error)
 		if (error) *error = 1;
 		return NULL;
 	}
-	
+
+	spotify->event_base = event_base_new();
+	if (!spotify->event_base) {
+		if (error) *error = 2;
+		return NULL;
+	}
+	register_event_callbacks(spotify);
+
 	/// The application key is specific to each project, and allows Spotify
 	/// to produce statistics on how our service is used.
 	extern const char g_appkey[];
@@ -113,26 +82,30 @@ spotify_init(const char *username, const char *password, int *error)
 	// Set the userdata to our spotify handle
 	config.userdata = spotify;
 
-	sp_error = sp_session_create(&config, &session);
+	sp_error = sp_session_create(&config, &sp_session);
 	if (sp_error != SP_ERROR_OK) {
 		fprintf(stderr, "failed to create session: %s\n",
 		                sp_error_message(sp_error));
-		if (error) *error = 10;
+
+		if (error) *error = 0x20;
+		free(spotify);
 		return NULL;
 	}
 
 	// Login using the credentials given.
-	sp_error = sp_session_login(session, username, password, 0, NULL);
+	sp_error = sp_session_login(sp_session, username, password, 0, NULL);
 
 	if (sp_error != SP_ERROR_OK) {
-		sp_session_release(session);
 		fprintf(stderr, "failed to login: %s\n",
 		                sp_error_message(sp_error));
-		if (error) *error = 11;
+		if (error) *error = 0x21;
+
+		sp_session_release(sp_session);
+		free(spotify);
 		return NULL;
 	}
 
-	spotify->session = session;
+	spotify->session = sp_session;
 	return spotify;
 }
 
@@ -140,203 +113,26 @@ void
 spotify_destroy(spotify_t *spotify)
 {
 	if (spotify) {
+		event_base_free(spotify->event_base);
 		sp_session_release(spotify->session);
 	}
 	free(spotify);
+}
+
+int
+spotify_run(spotify_t *spotify)
+{
+	if (!spotify) {
+		return -1;
+	}
+	return event_base_dispatch(spotify->event_base);
 }
 
 void
 spotify_stop(spotify_t *spotify)
 {
 	if (spotify) {
-		spotify->running = 0;
+		event_active(spotify->stop_event, 0, 0);
 	}
-}
-
-void
-spotify_run(spotify_t *spotify)
-{
-	int next_timeout = 0;
-
-	if (!spotify) {
-		return;
-	}
-	spotify->running = 1;
-	while (spotify->running) {
-	}
-}
-
-
-
-
-static void
-logged_in(sp_session *session, sp_error error)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-logged_out(sp_session *session)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-metadata_updated(sp_session *session)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-connection_error(sp_session *session, sp_error error)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-message_to_user(sp_session *session, const char *message)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-notify_main_thread(sp_session *session)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static int
-music_delivery(sp_session *session, const sp_audioformat *format, const void *frames, int num_frames)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-play_token_lost(sp_session *session)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-log_message(sp_session *session, const char *data)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-
-	fprintf(stderr, "%s", data);
-}
-static void
-end_of_track(sp_session *session)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-streaming_error(sp_session *session, sp_error error)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-userinfo_updated(sp_session *session)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-start_playback(sp_session *session)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-stop_playback(sp_session *session)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-get_audio_buffer_stats(sp_session *session, sp_audio_buffer_stats *stats)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-offline_status_updated(sp_session *session)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-offline_error(sp_session *session, sp_error error)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-credentials_blob_updated(sp_session *session, const char *blob)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-connectionstate_updated(sp_session *session)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-scrobble_error(sp_session *session, sp_error error)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
-}
-static void
-private_session_mode_changed(sp_session *session, bool is_private)
-{
-	spotify_t *spotify;
-
-	assert(spotify);
-	spotify = sp_session_userdata(session);
 }
 
