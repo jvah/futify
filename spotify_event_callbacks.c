@@ -26,13 +26,8 @@ register_event_callbacks(spotify_t *spotify)
 {
 	struct timeval forever;
 
-	/* This is a libevent hack, should be removed with libevent 2.1.
-         * http://stackoverflow.com/questions/7645217/user-triggered-event-in-libevent */
-	forever.tv_sec = 100000000;
-	forever.tv_usec = 0;
-
 	spotify->stop_event = event_new(spotify->event_base, SIGINT, EV_SIGNAL, stop_event_cb, spotify);
-	event_add(spotify->stop_event, &forever);
+	event_add(spotify->stop_event, NULL);
 
 	spotify->process_event = event_new(spotify->event_base, -1, 0, process_event_cb, spotify);
 	event_add(spotify->process_event, NULL);
