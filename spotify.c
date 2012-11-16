@@ -23,16 +23,14 @@ struct spotify_s {
 #include "spotify_event_callbacks.c"
 
 spotify_t *
-spotify_init(const char *username, const char *password, int *error)
+spotify_init(int *error)
 {
 	spotify_t *spotify;
 	sp_session_config config;
 	sp_error sp_error;
-	sp_session *sp_session;
 
 	memset(&config, 0, sizeof(sp_session_config));
 	memset(&sp_error, 0, sizeof(sp_error));
-	sp_session = NULL;
 
 	if (error) *error = 0;
 	spotify = calloc(1, sizeof(spotify_t));
@@ -82,7 +80,7 @@ spotify_init(const char *username, const char *password, int *error)
 	// Set the userdata to our spotify handle
 	config.userdata = spotify;
 
-	sp_error = sp_session_create(&config, &sp_session);
+	sp_error = sp_session_create(&config, &spotify->session);
 	if (sp_error != SP_ERROR_OK) {
 		fprintf(stderr, "failed to create session: %s\n",
 		                sp_error_message(sp_error));
@@ -91,22 +89,37 @@ spotify_init(const char *username, const char *password, int *error)
 		free(spotify);
 		return NULL;
 	}
-
-	// Login using the credentials given.
-	sp_error = sp_session_login(sp_session, username, password, 0, NULL);
-
-	if (sp_error != SP_ERROR_OK) {
-		fprintf(stderr, "failed to login: %s\n",
-		                sp_error_message(sp_error));
-		if (error) *error = 0x21;
-
-		sp_session_release(sp_session);
-		free(spotify);
-		return NULL;
-	}
-
-	spotify->session = sp_session;
 	return spotify;
+}
+
+void
+spotify_login(spotify_t *spotify, const char *username, const char *password)
+{
+	sp_error error;
+
+	if (!spotify) {
+		return;
+	}
+	error = sp_session_login(spotify->session, username, password, 0, NULL);
+	if (error != SP_ERROR_OK) {
+		fprintf(stderr, "failed to login: %s\n",
+		                sp_error_message(error));
+	}
+}
+
+void
+spotify_logout(spotify_t *spotify)
+{
+	sp_error error;
+
+	if (!spotify) {
+		return;
+	}
+	error = sp_session_logout(spotify->session);
+	if (error != SP_ERROR_OK) {
+		fprintf(stderr, "failed to logout: %s\n",
+		                sp_error_message(error));
+	}
 }
 
 void

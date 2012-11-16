@@ -39,15 +39,17 @@ main(int argc, char *argv[])
 #endif
 
 	signal(SIGINT, siginthandler);
-	spotify = spotify_init(argv[1], argv[2], &error);
+	spotify = spotify_init(&error);
 	if (!spotify) {
 		fprintf(stderr, "Spotify failed to initialize\n");
 		return -4;
 	}
+	spotify_login(spotify, argv[1], argv[2]);
 	ret = spotify_run(spotify);
 	if (ret) {
 		fprintf(stderr, "Event loop returned %d\n", ret);
 	}
+	spotify_logout(spotify);
 	spotify_destroy(spotify);
 
 	return 0;
