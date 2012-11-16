@@ -127,8 +127,8 @@ void
 spotify_destroy(spotify_t *spotify)
 {
 	if (spotify) {
-		event_base_free(spotify->event_base);
 		sp_session_release(spotify->session);
+		event_base_free(spotify->event_base);
 	}
 	free(spotify);
 }
