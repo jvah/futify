@@ -1,23 +1,15 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <signal.h>
 
 #include <event2/event.h>
 #include <event2/thread.h>
 
 #include "spotify.h"
 
-static spotify_t *spotify;
-
-static void
-siginthandler(int param)
-{
-	spotify_stop(spotify);
-}
-
 int
 main(int argc, char *argv[])
 {
+	spotify_t *spotify;
 	int error;
 	int ret;
 
@@ -38,7 +30,6 @@ main(int argc, char *argv[])
 # error "The libevent threading support not available"
 #endif
 
-	signal(SIGINT, siginthandler);
 	spotify = spotify_init(&error);
 	if (!spotify) {
 		fprintf(stderr, "Spotify failed to initialize\n");

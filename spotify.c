@@ -15,6 +15,7 @@ struct spotify_s {
 	struct event_base *event_base;
 
 	struct event *stop_event;
+	struct event *process_event;
 
 	sp_session *session;
 };
