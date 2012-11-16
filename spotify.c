@@ -11,6 +11,7 @@
 
 struct spotify_s {
 	sp_session *session;
+	int running;
 };
 
 static void logged_in(sp_session *session, sp_error error);
@@ -116,7 +117,7 @@ spotify_init(const char *username, const char *password, int *error)
 	if (sp_error != SP_ERROR_OK) {
 		fprintf(stderr, "failed to create session: %s\n",
 		                sp_error_message(sp_error));
-		if (error) *error = 2;
+		if (error) *error = 10;
 		return NULL;
 	}
 
@@ -127,7 +128,7 @@ spotify_init(const char *username, const char *password, int *error)
 		sp_session_release(session);
 		fprintf(stderr, "failed to login: %s\n",
 		                sp_error_message(sp_error));
-		if (error) *error = 3;
+		if (error) *error = 11;
 		return NULL;
 	}
 
@@ -145,10 +146,23 @@ spotify_destroy(spotify_t *spotify)
 }
 
 void
+spotify_stop(spotify_t *spotify)
+{
+	if (spotify) {
+		spotify->running = 0;
+	}
+}
+
+void
 spotify_run(spotify_t *spotify)
 {
+	int next_timeout = 0;
+
 	if (!spotify) {
 		return;
+	}
+	spotify->running = 1;
+	while (spotify->running) {
 	}
 }
 
