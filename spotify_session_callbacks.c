@@ -15,6 +15,7 @@ logged_in(sp_session *session, sp_error error)
 
 	spotify = sp_session_userdata(session);
 	assert(spotify);
+	spotify_listen(spotify);
 }
 
 static void
@@ -25,6 +26,7 @@ logged_out(sp_session *session)
 	fprintf(stderr, "Log out successful...\n");
 	spotify = sp_session_userdata(session);
 	assert(spotify);
+	spotify_unlisten(spotify);
 }
 
 static void

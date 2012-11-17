@@ -1,5 +1,5 @@
-#ifndef SPOTIFY_API_H
-#define SPOTIFY_API_H
+#ifndef SPOTIFY_SESSION_CALLBACKS_H
+#define SPOTIFY_SESSION_CALLBACKS_H
 
 #include <libspotify/api.h>
 

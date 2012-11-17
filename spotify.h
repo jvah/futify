@@ -12,4 +12,7 @@ void spotify_logout(spotify_t *spotify);
 int spotify_run(spotify_t *spotify);
 void spotify_stop(spotify_t *spotify);
 
+void spotify_listen(spotify_t *spotify);
+void spotify_unlisten(spotify_t *spotify);
+
 #endif

@@ -7,6 +7,10 @@
 #include "spotify_int.h"
 #include "spotify_events_int.h"
 #include "spotify_session_callbacks.h"
+#include "spotify_http_callbacks.h"
+
+#include <event2/event.h>
+#include <event2/http.h>
 
 #define USER_AGENT "Futify"
 #define VERSION "0.1"
@@ -14,6 +18,7 @@
 struct spotify_s {
 	struct event_base *event_base;
 	spotify_events_t events;
+	struct evhttp *evhttp;
 
 	sp_session *session;
 };
@@ -179,4 +184,30 @@ spotify_process_events(spotify_t *spotify, int *next_timeout)
 	do {
 		sp_session_process_events(spotify->session, next_timeout);
 	} while (*next_timeout == 0);
+}
+
+void
+spotify_listen(spotify_t *spotify)
+{
+	if (!spotify || spotify->evhttp) {
+		return;
+	}
+
+	spotify->evhttp = evhttp_new(spotify->event_base);
+	spotify_http_callbacks(spotify, spotify->evhttp);
+	if (evhttp_bind_socket(spotify->evhttp, "0.0.0.0", 9000) == -1) {
+		fprintf(stderr, "Error binding to socket\n");
+		spotify_unlisten(spotify);
+	}
+}
+
+void
+spotify_unlisten(spotify_t *spotify)
+{
+	if (!spotify || !spotify->evhttp) {
+		return;
+	}
+
+	evhttp_free(spotify->evhttp);
+	spotify->evhttp = NULL;
 }
