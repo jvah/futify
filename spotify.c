@@ -111,6 +111,8 @@ spotify_login(spotify_t *spotify, const char *username, const char *password)
 void
 spotify_logout(spotify_t *spotify)
 {
+	sp_connectionstate state;
+	int next_timeout;
 	sp_error error;
 
 	if (!spotify) {
@@ -120,6 +122,19 @@ spotify_logout(spotify_t *spotify)
 	if (error != SP_ERROR_OK) {
 		fprintf(stderr, "failed to logout: %s\n",
 		                sp_error_message(error));
+	}
+
+	/* FIXME: Slightly ugly loop, but we are out of event queue... */
+	state = sp_session_connectionstate(spotify->session);
+	while (state != SP_CONNECTION_STATE_LOGGED_OUT) {
+		/* Process libspotify event queue */
+		do {
+			sp_session_process_events(spotify->session, &next_timeout);
+		} while (next_timeout == 0);
+
+		/* Sleep for 1ms and check connectionstate again */
+		usleep(1000);
+		state = sp_session_connectionstate(spotify->session);
 	}
 }
 
