@@ -73,6 +73,7 @@ music_delivery(sp_session *session, const sp_audioformat *format, const void *fr
 
 	spotify = sp_session_userdata(session);
 	assert(spotify);
+	return 0;
 }
 
 static void

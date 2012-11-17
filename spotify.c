@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -137,6 +138,7 @@ spotify_destroy(spotify_t *spotify)
 {
 	if (spotify) {
 		sp_session_release(spotify->session);
+		spotify_events_destroy(&spotify->events);
 		event_base_free(spotify->event_base);
 	}
 	free(spotify);

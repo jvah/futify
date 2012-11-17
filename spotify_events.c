@@ -1,8 +1,9 @@
 #include <signal.h>
 #include <assert.h>
 
-#include "spotify_int.h"
+/* We need access to events and spotify_stop */
 #include "spotify_events_int.h"
+#include "spotify_int.h"
 
 static void
 stop_event_cb(evutil_socket_t fd, short event_flags, void *arg)
@@ -41,11 +42,17 @@ spotify_events_init(spotify_t *spotify, spotify_events_t *events, struct event_b
 
 	events->process_event = event_new(event_base, -1, 0, process_event_cb, spotify);
 	event_add(events->process_event, NULL);
+	return 0;
 }
 
 void
 spotify_events_destroy(spotify_events_t *events)
 {
+	event_free(events->stop_event);
+	event_free(events->process_event);
+
+	events->stop_event = NULL;
+	events->process_event = NULL;
 }
 
 void
