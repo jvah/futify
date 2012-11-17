@@ -3,31 +3,26 @@
 #include <string.h>
 #include <assert.h>
 
-#include <libspotify/api.h>
-#include <event2/event.h>
-
-#include "spotify.h"
+#include "spotify_int.h"
+#include "spotify_api.h"
+#include "spotify_events_int.h"
 
 #define USER_AGENT "Futify"
 #define VERSION "0.1"
 
 struct spotify_s {
 	struct event_base *event_base;
-
-	struct event *stop_event;
-	struct event *process_event;
+	spotify_events_t events;
 
 	sp_session *session;
 };
-
-#include "spotify_api_callbacks.c"
-#include "spotify_event_callbacks.c"
 
 spotify_t *
 spotify_init(int *error)
 {
 	spotify_t *spotify;
 	sp_session_config config;
+	sp_session_callbacks callbacks;
 	sp_error sp_error;
 
 	memset(&config, 0, sizeof(sp_session_config));
@@ -45,7 +40,7 @@ spotify_init(int *error)
 		if (error) *error = 2;
 		return NULL;
 	}
-	register_event_callbacks(spotify);
+	spotify_events_init(spotify, &spotify->events, spotify->event_base);
 
 	/// The application key is specific to each project, and allows Spotify
 	/// to produce statistics on how our service is used.
@@ -76,6 +71,7 @@ spotify_init(int *error)
 	config.user_agent = USER_AGENT" "VERSION;
 
 	// Register the callbacks.
+	spotify_api_set_callbacks(&callbacks);
 	config.callbacks = &callbacks;
 
 	// Set the userdata to our spotify handle
@@ -128,9 +124,7 @@ spotify_logout(spotify_t *spotify)
 	state = sp_session_connectionstate(spotify->session);
 	while (state != SP_CONNECTION_STATE_LOGGED_OUT) {
 		/* Process libspotify event queue */
-		do {
-			sp_session_process_events(spotify->session, &next_timeout);
-		} while (next_timeout == 0);
+		spotify_process_events(spotify, &next_timeout);
 
 		/* Sleep for 1ms and check connectionstate again */
 		usleep(1000);
@@ -161,7 +155,26 @@ void
 spotify_stop(spotify_t *spotify)
 {
 	if (spotify) {
-		event_active(spotify->stop_event, 0, 0);
+		event_base_loopbreak(spotify->event_base);
 	}
 }
 
+
+
+spotify_events_t *
+spotify_get_events(spotify_t *spotify)
+{
+	spotify_events_t *events = NULL;
+	if (spotify) {
+		events = &spotify->events;
+	}
+	return events;
+}
+
+void
+spotify_process_events(spotify_t *spotify, int *next_timeout)
+{
+	do {
+		sp_session_process_events(spotify->session, next_timeout);
+	} while (*next_timeout == 0);
+}

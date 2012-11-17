@@ -1,3 +1,13 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
+
+#include "spotify_api.h"
+
+/* We need access to spotify_get_events and events struct */
+#include "spotify_int.h"
+#include "spotify_events_int.h"
+
 static void
 logged_in(sp_session *session, sp_error error)
 {
@@ -12,6 +22,7 @@ logged_out(sp_session *session)
 {
 	spotify_t *spotify;
 
+	fprintf(stderr, "Log out successful...\n");
 	spotify = sp_session_userdata(session);
 	assert(spotify);
 }
@@ -47,10 +58,12 @@ static void
 notify_main_thread(sp_session *session)
 {
 	spotify_t *spotify;
+	spotify_events_t *events;
 
 	spotify = sp_session_userdata(session);
 	assert(spotify);
-	event_active(spotify->process_event, 0, 0);
+	events = spotify_get_events(spotify);
+	event_active(events->process_event, 0, 0);
 }
 
 static int
@@ -190,28 +203,32 @@ private_session_mode_changed(sp_session *session, bool is_private)
 	assert(spotify);
 }
 
-static sp_session_callbacks callbacks = {
-	&logged_in,
-	&logged_out,
-	&metadata_updated,
-	&connection_error,
-	&message_to_user,
-	&notify_main_thread,
-	&music_delivery,
-	&play_token_lost,
-	&log_message,
-	&end_of_track,
-	&streaming_error,
-	&userinfo_updated,
-	&start_playback,
-	&stop_playback,
-	&get_audio_buffer_stats,
-	&offline_status_updated,
-	&offline_error,
-	&credentials_blob_updated,
-	&connectionstate_updated,
-	&scrobble_error,
-	&private_session_mode_changed
-};
+void
+spotify_api_set_callbacks(sp_session_callbacks *callbacks)
+{
+	assert(callbacks);
+
+	callbacks->logged_in = &logged_in;
+	callbacks->logged_out = &logged_out;
+	callbacks->metadata_updated = &metadata_updated;
+	callbacks->connection_error = &connection_error;
+	callbacks->message_to_user = &message_to_user;
+	callbacks->notify_main_thread = &notify_main_thread;
+	callbacks->music_delivery = &music_delivery;
+	callbacks->play_token_lost = &play_token_lost;
+	callbacks->log_message = &log_message;
+	callbacks->end_of_track = &end_of_track;
+	callbacks->streaming_error = &streaming_error;
+	callbacks->userinfo_updated = &userinfo_updated;
+	callbacks->start_playback = &start_playback;
+	callbacks->stop_playback = &stop_playback;
+	callbacks->get_audio_buffer_stats = &get_audio_buffer_stats;
+	callbacks->offline_status_updated = &offline_status_updated;
+	callbacks->offline_error = &offline_error;
+	callbacks->credentials_blob_updated = &credentials_blob_updated;
+	callbacks->connectionstate_updated = &connectionstate_updated;
+	callbacks->scrobble_error = &scrobble_error;
+	callbacks->private_session_mode_changed = &private_session_mode_changed;
+}
 
 
