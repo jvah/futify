@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include "spotify_api.h"
+#include "spotify_session_callbacks.h"
 
 /* We need access to spotify_get_events and events struct */
 #include "spotify_int.h"
@@ -205,7 +205,7 @@ private_session_mode_changed(sp_session *session, bool is_private)
 }
 
 void
-spotify_api_set_callbacks(sp_session_callbacks *callbacks)
+spotify_session_callbacks(sp_session_callbacks *callbacks)
 {
 	assert(callbacks);
 

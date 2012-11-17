@@ -5,8 +5,8 @@
 #include <assert.h>
 
 #include "spotify_int.h"
-#include "spotify_api.h"
 #include "spotify_events_int.h"
+#include "spotify_session_callbacks.h"
 
 #define USER_AGENT "Futify"
 #define VERSION "0.1"
@@ -72,7 +72,7 @@ spotify_init(int *error)
 	config.user_agent = USER_AGENT" "VERSION;
 
 	// Register the callbacks.
-	spotify_api_set_callbacks(&callbacks);
+	spotify_session_callbacks(&callbacks);
 	config.callbacks = &callbacks;
 
 	// Set the userdata to our spotify handle
